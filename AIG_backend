@@ -1,0 +1,179 @@
+from fastapi import FastAPI, HTTPException, Depends
+from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, ForeignKey
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, Session, relationship
+from pydantic import BaseModel, EmailStr
+from datetime import datetime
+import uuid
+from typing import List, Optional
+import math
+
+# Database setup
+SQLALCHEMY_DATABASE_URL = "postgresql://user:password@localhost/uba_db"
+engine = create_engine(SQLALCHEMY_DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
+# Database Models
+class User(Base):
+    __tablename__ = "users"
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    email = Column(String, unique=True, index=True)
+    hashed_password = Column(String)
+    full_name = Column(String)
+    location_zip = Column(String)
+    location_city = Column(String)
+    bio = Column(String, nullable=True)
+    profile_picture_url = Column(String, nullable=True)
+    social_media_links = Column(String, nullable=True)
+    current_rank = Column(Float, default=1000.0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    matches_as_player1 = relationship("Match", foreign_keys="Match.player1_id", back_populates="player1")
+    matches_as_player2 = relationship("Match", foreign_keys="Match.player2_id", back_populates="player2")
+
+class Match(Base):
+    __tablename__ = "matches"
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    player1_id = Column(String, ForeignKey("users.id"))
+    player2_id = Column(String, ForeignKey("users.id"))
+    player1_score = Column(Integer)
+    player2_score = Column(Integer)
+    played_at = Column(DateTime, default=datetime.utcnow)
+    
+    player1 = relationship("User", foreign_keys=[player1_id], back_populates="matches_as_player1")
+    player2 = relationship("User", foreign_keys=[player2_id], back_populates="matches_as_player2")
+
+# Pydantic Models for API
+class UserCreate(BaseModel):
+    email: EmailStr
+    password: str
+    full_name: str
+    location_zip: str
+    location_city: str
+
+class UserUpdate(BaseModel):
+    bio: Optional[str] = None
+    profile_picture_url: Optional[str] = None
+    social_media_links: Optional[str] = None
+
+class MatchCreate(BaseModel):
+    player2_id: str
+    player1_score: int
+    player2_score: int
+
+# ELO Rating Calculator
+def calculate_elo_change(player1_rank: float, player2_rank: float, player1_won: bool, k_factor: int = 32):
+    expected_score1 = 1 / (1 + math.pow(10, (player2_rank - player1_rank) / 400))
+    actual_score1 = 1 if player1_won else 0
+    
+    rank_change = k_factor * (actual_score1 - expected_score1)
+    return rank_change
+
+# FastAPI App
+app = FastAPI(title="Underground Basketball Association API")
+
+# Dependency
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+# API Endpoints
+@app.post("/users/", response_model=dict)
+async def create_user(user: UserCreate, db: Session = Depends(get_db)):
+    db_user = User(
+        email=user.email,
+        hashed_password="hashed_" + user.password,  # Note: Implement proper hashing
+        full_name=user.full_name,
+        location_zip=user.location_zip,
+        location_city=user.location_city
+    )
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    return {"message": "User created successfully", "user_id": db_user.id}
+
+@app.post("/matches/", response_model=dict)
+async def create_match(match: MatchCreate, current_user_id: str, db: Session = Depends(get_db)):
+    # Validate scores
+    if not (0 <= match.player1_score <= 15 and 0 <= match.player2_score <= 15):
+        raise HTTPException(status_code=400, detail="Invalid scores")
+    
+    # Create match
+    db_match = Match(
+        player1_id=current_user_id,
+        player2_id=match.player2_id,
+        player1_score=match.player1_score,
+        player2_score=match.player2_score
+    )
+    
+    # Get players
+    player1 = db.query(User).filter(User.id == current_user_id).first()
+    player2 = db.query(User).filter(User.id == match.player2_id).first()
+    
+    # Calculate new rankings
+    player1_won = match.player1_score > match.player2_score
+    rank_change = calculate_elo_change(player1.current_rank, player2.current_rank, player1_won)
+    
+    # Update rankings
+    player1.current_rank += rank_change
+    player2.current_rank -= rank_change
+    
+    db.add(db_match)
+    db.commit()
+    
+    return {
+        "message": "Match recorded successfully",
+        "match_id": db_match.id,
+        "new_ranks": {
+            "player1": player1.current_rank,
+            "player2": player2.current_rank
+        }
+    }
+
+@app.get("/leaderboard/")
+async def get_leaderboard(
+    location_zip: Optional[str] = None,
+    location_city: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    query = db.query(User).order_by(User.current_rank.desc())
+    
+    if location_zip:
+        query = query.filter(User.location_zip == location_zip)
+    if location_city:
+        query = query.filter(User.location_city == location_city)
+    
+    leaders = query.limit(100).all()
+    return [{"id": user.id, "name": user.full_name, "rank": user.current_rank} for user in leaders]
+
+@app.get("/users/{user_id}/stats")
+async def get_user_stats(user_id: str, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Get matches
+    matches_as_p1 = db.query(Match).filter(Match.player1_id == user_id).all()
+    matches_as_p2 = db.query(Match).filter(Match.player2_id == user_id).all()
+    
+    # Calculate stats
+    total_matches = len(matches_as_p1) + len(matches_as_p2)
+    wins = sum(1 for m in matches_as_p1 if m.player1_score > m.player2_score) + \
+           sum(1 for m in matches_as_p2 if m.player2_score > m.player1_score)
+    
+    return {
+        "total_matches": total_matches,
+        "wins": wins,
+        "losses": total_matches - wins,
+        "win_rate": (wins / total_matches) if total_matches > 0 else 0,
+        "current_rank": user.current_rank
+    }
+
+# Create database tables
+Base.metadata.create_all(bind=engine)
