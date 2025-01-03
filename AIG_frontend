@@ -1,0 +1,195 @@
+import React, { useState, useEffect } from 'react';
+import { LineChart, XAxis, YAxis, Tooltip, Line, ResponsiveContainer } from 'recharts';
+import { User, Trophy, Activity, Users, LogIn, Home } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+
+// Main App Component
+const App = () => {
+  const [user, setUser] = useState(null);
+  const [currentPage, setCurrentPage] = useState('home');
+  
+  const renderPage = () => {
+    switch(currentPage) {
+      case 'home':
+        return <Dashboard user={user} />;
+      case 'leaderboard':
+        return <Leaderboard />;
+      case 'matches':
+        return <MatchLogging user={user} />;
+      case 'profile':
+        return <Profile user={user} />;
+      case 'login':
+        return <Login setUser={setUser} onSuccess={() => setCurrentPage('home')} />;
+      default:
+        return <Dashboard user={user} />;
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-100">
+      <Navigation 
+        user={user} 
+        currentPage={currentPage}
+        setCurrentPage={setCurrentPage}
+      />
+      <main className="container mx-auto px-4 py-8">
+        {renderPage()}
+      </main>
+    </div>
+  );
+};
+
+// Navigation Component
+const Navigation = ({ user, currentPage, setCurrentPage }) => (
+  <nav className="bg-white shadow-lg">
+    <div className="container mx-auto px-4">
+      <div className="flex justify-between items-center h-16">
+        <div className="flex items-center space-x-4">
+          <span className="text-orange-500 font-bold text-xl">UBA</span>
+          <button 
+            onClick={() => setCurrentPage('home')} 
+            className={`flex items-center space-x-1 ${currentPage === 'home' ? 'text-orange-500' : 'text-gray-700 hover:text-orange-500'}`}
+          >
+            <Home size={20} />
+            <span>Home</span>
+          </button>
+          <button 
+            onClick={() => setCurrentPage('leaderboard')}
+            className={`flex items-center space-x-1 ${currentPage === 'leaderboard' ? 'text-orange-500' : 'text-gray-700 hover:text-orange-500'}`}
+          >
+            <Trophy size={20} />
+            <span>Leaderboard</span>
+          </button>
+          <button 
+            onClick={() => setCurrentPage('matches')}
+            className={`flex items-center space-x-1 ${currentPage === 'matches' ? 'text-orange-500' : 'text-gray-700 hover:text-orange-500'}`}
+          >
+            <Activity size={20} />
+            <span>Log Match</span>
+          </button>
+        </div>
+        <div>
+          {user ? (
+            <button 
+              onClick={() => setCurrentPage('profile')}
+              className={`flex items-center space-x-1 ${currentPage === 'profile' ? 'text-orange-500' : 'text-gray-700 hover:text-orange-500'}`}
+            >
+              <User size={20} />
+              <span>{user.full_name}</span>
+            </button>
+          ) : (
+            <button 
+              onClick={() => setCurrentPage('login')}
+              className={`flex items-center space-x-1 ${currentPage === 'login' ? 'text-orange-500' : 'text-gray-700 hover:text-orange-500'}`}
+            >
+              <LogIn size={20} />
+              <span>Login</span>
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  </nav>
+);
+
+// Dashboard Component
+const Dashboard = ({ user }) => {
+  const [stats, setStats] = useState(null);
+  const [recentMatches, setRecentMatches] = useState([]);
+
+  useEffect(() => {
+    if (user) {
+      // Fetch user stats and recent matches
+      setStats({
+        current_rank: 1250,
+        total_matches: 15,
+        wins: 10,
+        losses: 5,
+        win_rate: 0.67
+      });
+
+      setRecentMatches([
+        { date: '2024-01', rank: 1200 },
+        { date: '2024-02', rank: 1220 },
+        { date: '2024-03', rank: 1250 }
+      ]);
+    }
+  }, [user]);
+
+  if (!user) {
+    return (
+      <Alert>
+        <AlertDescription>
+          Please log in to view your dashboard.
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <h1 className="text-3xl font-bold">Welcome, {user?.full_name}</h1>
+      
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>Current Rank</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-orange-500">
+              {stats?.current_rank}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Win Rate</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-green-500">
+              {(stats?.win_rate * 100).toFixed(1)}%
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Total Matches</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">
+              {stats?.total_matches}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Rank Progress</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={recentMatches}>
+                <XAxis dataKey="date" />
+                <YAxis />
+                <Tooltip />
+                <Line type="monotone" dataKey="rank" stroke="#FF5733" />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+// Other components (Leaderboard, MatchLogging, Profile, Login) remain the same
+// but remove any router-specific code
+
+export default App;
