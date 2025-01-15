@@ -1,0 +1,25 @@
+flowchart TD
+    A[App.js] --> B[Frontend Components]
+    A --> C[Backend API]
+    
+    subgraph B[Frontend Components]
+        D[Dashboard] 
+        E[Leaderboard]
+        F[MatchLogging]
+        G[Profile]
+    end
+
+    subgraph C[Backend API]
+        H[User Routes]
+        I[Match Routes]
+        J[Auth Routes]
+        K[(Database)]
+    end
+
+    D --> H
+    E --> H
+    F --> I
+    G --> H
+    H --> K
+    I --> K
+    J --> K

@@ -1,0 +1,34 @@
+uba-app/                     # Main project folder
+│
+├── backend/                 # All backend code
+│   ├── app/                # Main application package
+│   │   ├── __init__.py    # Makes the folder a Python package
+│   │   ├── main.py        # FastAPI application entry point
+│   │   ├── models.py      # Database models
+│   │   └── routes/        # API route handlers
+│   │       ├── __init__.py
+│   │       ├── users.py   # User-related endpoints
+│   │       ├── matches.py # Match-related endpoints
+│   │       └── auth.py    # Authentication endpoints
+│   │
+│   ├── venv/              # Python virtual environment (will be created)
+│   └── requirements.txt    # Python dependencies
+│
+├── frontend/               # All frontend code
+│   ├── public/            # Static files
+│   │   └── index.html     # Main HTML file
+│   │
+│   ├── src/               # React source code
+│   │   ├── components/    # React components
+│   │   │   ├── Dashboard.js
+│   │   │   ├── Leaderboard.js
+│   │   │   ├── MatchLogging.js
+│   │   │   └── Profile.js
+│   │   │
+│   │   ├── App.js        # Main React component
+│   │   └── index.js      # React entry point
+│   │
+│   ├── package.json      # Node.js dependencies
+│   └── tailwind.config.js # Tailwind configuration
+│
+└── README.md             # Project documentation

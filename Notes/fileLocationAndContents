@@ -1,0 +1,26 @@
+1. Backend Main (backend/app/main.py):
+   - FastAPI application setup
+   - Database connection
+   - CORS configuration
+   - Route registration
+
+2. Backend Models (backend/app/models.py):
+   - User model
+   - Match model
+   - Database schemas
+
+3. Frontend Components:
+   frontend/src/components/
+   ├── Dashboard.js     # User dashboard with stats
+   ├── Leaderboard.js   # Global rankings
+   ├── MatchLogging.js  # Match input form
+   └── Profile.js       # User profile management
+
+4. Main App (frontend/src/App.js):
+   - Main application component
+   - Navigation
+   - Route handling
+
+5. Database Script (scripts/init_db.py):
+   - Database initialization
+   - Sample data creation

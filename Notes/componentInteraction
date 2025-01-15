@@ -1,0 +1,183 @@
+Let me explain how the components interact with each other by following a typical user flow through the application.
+
+flowchart TD
+A[App.js] --> B[Frontend Components]
+A --> C[Backend API]
+
+    subgraph B[Frontend Components]
+        D[Dashboard]
+        E[Leaderboard]
+        F[MatchLogging]
+        G[Profile]
+    end
+
+    subgraph C[Backend API]
+        H[User Routes]
+        I[Match Routes]
+        J[Auth Routes]
+        K[(Database)]
+    end
+
+    D --> H
+    E --> H
+    F --> I
+    G --> H
+    H --> K
+    I --> K
+    J --> K
+
+Let me break down how these components interact:
+
+1. **App.js (Main Component) Interactions:**
+
+```javascript
+// App.js manages state and passes it to child components
+const App = () => {
+    const [user, setUser] = useState(null);
+    const [currentPage, setCurrentPage] = useState('home');
+
+    // This state is shared with all components that need user info
+    return (
+        <Dashboard user={user} />
+        <Leaderboard />
+        <MatchLogging user={user} />
+        <Profile user={user} />
+    );
+}
+```
+
+2. **Frontend to Backend Interactions:**
+
+```javascript
+// Example of how Dashboard component fetches data
+const Dashboard = ({ user }) => {
+  const [stats, setStats] = useState(null);
+
+  useEffect(() => {
+    // Calls backend API to get user stats
+    fetch(`/api/users/${user.id}/stats`)
+      .then((response) => response.json())
+      .then((data) => setStats(data));
+  }, [user]);
+};
+```
+
+3. **Backend Route to Database Interactions:**
+
+```python
+# backend/app/routes/matches.py
+@router.post("/matches/")
+async def create_match(match_data: MatchCreate, db: Session):
+    # 1. Create new match in database
+    new_match = Match(**match_data.dict())
+    db.add(new_match)
+
+    # 2. Update player rankings
+    update_rankings(match_data.player1_id, match_data.player2_id)
+
+    # 3. Return updated data
+    return {"status": "success", "match_id": new_match.id}
+```
+
+Let's look at a complete interaction flow using the Match Logging feature:
+
+1. **User Logs a Match:**
+
+```javascript
+// MatchLogging.js
+const MatchLogging = ({ user }) => {
+  const handleSubmit = async (matchData) => {
+    try {
+      // 1. Send match data to backend
+      const response = await fetch("/api/matches/", {
+        method: "POST",
+        body: JSON.stringify(matchData),
+      });
+
+      // 2. Get updated rankings
+      const result = await response.json();
+
+      // 3. Show success message
+      setMessage("Match logged successfully!");
+    } catch (error) {
+      setError("Failed to log match");
+    }
+  };
+};
+```
+
+2. **Backend Processes Match:**
+
+```python
+# backend/app/routes/matches.py
+@router.post("/matches/")
+async def create_match(match_data: MatchCreate, db: Session):
+    # 1. Validate match data
+    validate_match(match_data)
+
+    # 2. Create match record
+    new_match = create_match_record(db, match_data)
+
+    # 3. Update player rankings
+    update_player_rankings(db, match_data)
+
+    # 4. Send notifications (if any)
+    notify_players(match_data)
+
+    return {"success": True, "new_rankings": updated_rankings}
+```
+
+3. **Database Updates:**
+
+```python
+# backend/app/models.py
+class Match(Base):
+    __tablename__ = "matches"
+
+    def after_insert(self):
+        # Update related tables/stats
+        update_user_stats(self.player1_id)
+        update_user_stats(self.player2_id)
+        update_leaderboard()
+```
+
+4. **Dashboard Updates:**
+
+```javascript
+// Dashboard.js automatically refreshes when new data is available
+useEffect(() => {
+  // Fetch latest stats after match is logged
+  fetchUserStats();
+  fetchRecentMatches();
+}, [lastUpdate]);
+```
+
+Key Points about Component Interaction:
+
+1. **State Management:**
+
+   - `App.js` holds main application state
+   - Child components receive state via props
+   - Components update state through functions passed down from `App.js`
+
+2. **Data Flow:**
+
+   - Frontend → Backend: API requests (fetch/axios)
+   - Backend → Database: SQL queries via SQLAlchemy
+   - Database → Frontend: API responses with updated data
+
+3. **Event Chain:**
+   - User action (e.g., logging a match)
+   - Frontend validation
+   - API request
+   - Backend validation
+   - Database update
+   - Response to frontend
+   - UI update
+
+Would you like me to:
+
+1. Show more detailed code for any of these interactions?
+2. Explain a specific flow in more detail?
+3. Add error handling and loading states?
+4. Show how to debug these interactions?
